@@ -1,0 +1,6 @@
+{
+  "name": "PakSchool SMS",
+  "description": "Comprehensive School Management System for Pakistani institutions (KG to 2nd Year) featuring attendance, fee management, staff payroll, and WhatsApp alerts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
