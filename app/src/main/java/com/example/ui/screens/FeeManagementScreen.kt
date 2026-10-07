@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +40,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -120,13 +122,13 @@ fun FeeManagementScreen(
 
                 Column {
                     Text(
-                        text = "Fee Management",
+                        text = "Fee Payment Tracker",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF1E40AF)
                     )
                     Text(
-                        text = "Vouchers & Ledger • Class: $selectedClass",
+                        text = "فیس وصولی و رسیدات • Class: $selectedClass",
                         fontSize = 11.sp,
                         color = Color(0xFF64748B)
                     )
@@ -220,6 +222,20 @@ fun FeeManagementScreen(
                     student = student,
                     onOpenChallan = { challanStudentTarget = student },
                     onRecordPayment = { paymentStudentTarget = student },
+                    onSendUrduReceipt = {
+                        val receiptId = "REC-${System.currentTimeMillis().toString().takeLast(6)}"
+                        val msg = WhatsAppHelper.buildFeeReceiptUrduMessage(
+                            studentName = student.name,
+                            rollNo = student.rollNo,
+                            className = student.className,
+                            month = "October 2026",
+                            amountPaid = student.monthlyFee,
+                            receiptId = receiptId,
+                            date = viewModel.todayDateString
+                        )
+                        WhatsAppHelper.sendWhatsAppMessage(context, student.parentPhone, msg)
+                        Toast.makeText(context, "Opening WhatsApp with Urdu receipt...", Toast.LENGTH_SHORT).show()
+                    },
                     onSendWhatsAppReminder = {
                         val msg = WhatsAppHelper.buildFeeReminderMessage(
                             studentName = student.name,
@@ -242,17 +258,41 @@ fun FeeManagementScreen(
             onDismiss = { challanStudentTarget = null },
             onRecordPayment = {
                 viewModel.recordFeePayment(student, "October 2026", student.monthlyFee, 0, "Cash")
+                val receiptId = "REC-${System.currentTimeMillis().toString().takeLast(6)}"
+                val urduReceipt = WhatsAppHelper.buildFeeReceiptUrduMessage(
+                    studentName = student.name,
+                    rollNo = student.rollNo,
+                    className = student.className,
+                    month = "October 2026",
+                    amountPaid = student.monthlyFee,
+                    receiptId = receiptId,
+                    date = viewModel.todayDateString
+                )
+                WhatsAppHelper.sendWhatsAppMessage(context, student.parentPhone, urduReceipt)
+                challanStudentTarget = null
             }
         )
     }
 
-    // Record Payment Dialog
+    // Record Payment Dialog with Auto-Urdu Receipt Trigger
     paymentStudentTarget?.let { student ->
         RecordPaymentDialog(
             student = student,
             onDismiss = { paymentStudentTarget = null },
             onConfirm = { month, amount, discount, method ->
                 viewModel.recordFeePayment(student, month, amount, discount, method)
+                val receiptId = "REC-${System.currentTimeMillis().toString().takeLast(6)}"
+                val urduReceipt = WhatsAppHelper.buildFeeReceiptUrduMessage(
+                    studentName = student.name,
+                    rollNo = student.rollNo,
+                    className = student.className,
+                    month = month,
+                    amountPaid = amount,
+                    receiptId = receiptId,
+                    date = viewModel.todayDateString
+                )
+                WhatsAppHelper.sendWhatsAppMessage(context, student.parentPhone, urduReceipt)
+                Toast.makeText(context, "Payment Recorded! Opening Urdu Receipt in WhatsApp...", Toast.LENGTH_SHORT).show()
                 paymentStudentTarget = null
             }
         )
@@ -271,12 +311,13 @@ private fun FeeSummaryCard(
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.5.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
-            Text(text = title, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(text = amount, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = color)
-            Text(text = sub, fontSize = 9.sp, color = Color.Gray)
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(text = title, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = amount, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = color)
+            Text(text = sub, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f))
         }
     }
 }
@@ -286,12 +327,19 @@ private fun StudentFeeCard(
     student: StudentEntity,
     onOpenChallan: () -> Unit,
     onRecordPayment: () -> Unit,
+    onSendUrduReceipt: () -> Unit,
     onSendWhatsAppReminder: () -> Unit
 ) {
     val statusColor = when (student.feeStatus) {
         "PAID" -> Color(0xFF2E7D32)
         "PENDING" -> AccentGold
         else -> AlertRed
+    }
+
+    val statusIcon = when (student.feeStatus) {
+        "PAID" -> Icons.Default.CheckCircle
+        "PENDING" -> Icons.Default.HourglassEmpty
+        else -> Icons.Default.ErrorOutline
     }
 
     Card(
@@ -308,26 +356,48 @@ private fun StudentFeeCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(text = student.name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Text(
-                        text = "Roll: ${student.rollNo} • ${student.className} (${student.section}) • ${student.parentPhone}",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(PrimaryGreen.copy(alpha = 0.12f), RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = student.rollNo.takeLast(2),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PrimaryGreen
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(text = student.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF0F172A))
+                        Text(
+                            text = "${student.rollNo} • ${student.className} • ${student.parentPhone}",
+                            fontSize = 11.sp,
+                            color = Color(0xFF475569)
+                        )
+                    }
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(6.dp),
                     color = statusColor.copy(alpha = 0.12f)
                 ) {
-                    Text(
-                        text = student.feeStatus,
-                        color = statusColor,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(statusIcon, contentDescription = null, tint = statusColor, modifier = Modifier.size(12.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = student.feeStatus,
+                            color = statusColor,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                    }
                 }
             }
 
@@ -344,7 +414,8 @@ private fun StudentFeeCard(
                     Text(
                         text = "Rs. ${student.monthlyFee} / month",
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp
+                        fontSize = 13.sp,
+                        color = Color(0xFF0F172A)
                     )
                 }
 
@@ -354,32 +425,43 @@ private fun StudentFeeCard(
                     OutlinedButton(
                         onClick = onOpenChallan,
                         shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.height(32.dp)
+                        modifier = Modifier.height(34.dp)
                     ) {
                         Icon(Icons.Default.ReceiptLong, contentDescription = null, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Challan", fontSize = 11.sp)
                     }
 
-                    // If not paid, show Pay Fee
-                    if (student.feeStatus != "PAID") {
+                    // If paid: offer Urdu Receipt to WhatsApp
+                    if (student.feeStatus == "PAID") {
+                        Button(
+                            onClick = onSendUrduReceipt,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.height(34.dp).testTag("btn_urdu_receipt_${student.rollNo}")
+                        ) {
+                            Text("🧾 اردو رسید", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        // If not paid: show Collect & Send Reminder
                         Button(
                             onClick = onRecordPayment,
                             colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen),
                             shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.height(32.dp)
+                            modifier = Modifier.height(34.dp)
                         ) {
                             Text("Collect", fontSize = 11.sp)
                         }
 
-                        // WhatsApp reminder
                         Button(
                             onClick = onSendWhatsAppReminder,
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
                             shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.height(32.dp)
+                            modifier = Modifier.height(34.dp)
                         ) {
                             Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(12.dp))
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text("یاددہانی", fontSize = 11.sp)
                         }
                     }
                 }
@@ -400,6 +482,7 @@ private fun RecordPaymentDialog(
     var discountString by remember { mutableStateOf("0") }
     var paymentMethod by remember { mutableStateOf("Cash") }
     var methodExpanded by remember { mutableStateOf(false) }
+    var validationError by remember { mutableStateOf<String?>(null) }
 
     val methods = listOf("Cash", "JazzCash", "EasyPaisa", "Bank Transfer (HBL/UBL)")
 
@@ -420,26 +503,64 @@ private fun RecordPaymentDialog(
                     fontSize = 13.sp
                 )
 
+                if (validationError != null) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFFEE2E2),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "⚠️ $validationError",
+                            color = Color(0xFFDC2626),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
+                }
+
                 OutlinedTextField(
                     value = month,
                     onValueChange = { month = it },
-                    label = { Text("Fee Month") },
+                    label = { Text("Fee Month", color = Color(0xFF475569)) },
+                    textStyle = androidx.compose.ui.text.TextStyle(color = Color(0xFF0F172A), fontSize = 14.sp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color(0xFF0F172A),
+                        unfocusedTextColor = Color(0xFF1E293B)
+                    ),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
                     value = amountString,
-                    onValueChange = { amountString = it },
-                    label = { Text("Amount Collected (PKR)") },
+                    onValueChange = {
+                        amountString = it
+                        validationError = null
+                    },
+                    label = { Text("Amount Collected (PKR)", color = Color(0xFF475569)) },
+                    textStyle = androidx.compose.ui.text.TextStyle(color = Color(0xFF0F172A), fontSize = 14.sp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color(0xFF0F172A),
+                        unfocusedTextColor = Color(0xFF1E293B)
+                    ),
+                    isError = validationError != null,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
                     value = discountString,
-                    onValueChange = { discountString = it },
-                    label = { Text("Discount / Concession (PKR)") },
+                    onValueChange = {
+                        discountString = it
+                        validationError = null
+                    },
+                    label = { Text("Discount / Concession (PKR)", color = Color(0xFF475569)) },
+                    textStyle = androidx.compose.ui.text.TextStyle(color = Color(0xFF0F172A), fontSize = 14.sp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color(0xFF0F172A),
+                        unfocusedTextColor = Color(0xFF1E293B)
+                    ),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -452,7 +573,12 @@ private fun RecordPaymentDialog(
                         value = paymentMethod,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Payment Channel") },
+                        label = { Text("Payment Channel", color = Color(0xFF475569)) },
+                        textStyle = androidx.compose.ui.text.TextStyle(color = Color(0xFF0F172A), fontSize = 14.sp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color(0xFF0F172A),
+                            unfocusedTextColor = Color(0xFF1E293B)
+                        ),
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = methodExpanded) },
                         modifier = Modifier.menuAnchor().fillMaxWidth()
                     )
@@ -471,18 +597,43 @@ private fun RecordPaymentDialog(
                         }
                     }
                 }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFEFF6FF),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "📱 وصولی کے بعد والدین کو خودکار اردو رسید واٹس ایپ پر ارسال کی جائے گی۔",
+                        fontSize = 11.sp,
+                        color = Color(0xFF1E40AF),
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    val amount = amountString.toIntOrNull() ?: student.monthlyFee
-                    val discount = discountString.toIntOrNull() ?: 0
-                    onConfirm(month, amount, discount, paymentMethod)
+                    val amountResult = com.example.util.SecurityHelper.validatePositiveAmount(amountString)
+                    if (amountResult.isFailure) {
+                        validationError = amountResult.exceptionOrNull()?.message ?: "Invalid amount"
+                        return@Button
+                    }
+                    val validAmount = amountResult.getOrThrow()
+
+                    val discountResult = com.example.util.SecurityHelper.validateDiscount(discountString, validAmount)
+                    if (discountResult.isFailure) {
+                        validationError = discountResult.exceptionOrNull()?.message ?: "Invalid discount"
+                        return@Button
+                    }
+                    val validDiscount = discountResult.getOrThrow()
+
+                    onConfirm(month, validAmount, validDiscount, paymentMethod)
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
             ) {
-                Text("Confirm & Issue Receipt")
+                Text("Confirm & Send Urdu Receipt")
             }
         },
         dismissButton = {

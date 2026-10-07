@@ -25,7 +25,7 @@ import java.util.Locale
         StaffMemberEntity::class,
         BroadcastAlertEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class SchoolDatabase : RoomDatabase() {

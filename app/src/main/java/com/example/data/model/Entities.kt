@@ -27,10 +27,11 @@ data class StudentEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val rollNo: String,
     val name: String,
-    val fatherName: String,
+    val age: Int = 6,
+    val fatherName: String = "",
     val className: String,
     val section: String = "A",
-    val parentPhone: String,
+    val parentPhone: String = "",
     val monthlyFee: Int = 3500,
     val feeStatus: String = "PAID", // PAID, PENDING, DEFAULTER
     val gender: String = "Male",
@@ -73,9 +74,16 @@ data class StaffMemberEntity(
     val phone: String,
     val subject: String,
     val monthlySalary: Int,
-    val salaryStatus: String = "PAID", // PAID, PENDING, ADVANCE
-    val attendanceToday: String = "PRESENT" // PRESENT, ABSENT, LEAVE
-)
+    val salaryStatus: String = "PAID", // PAID, PARTIAL, PENDING, ADVANCE
+    val attendanceToday: String = "PRESENT", // PRESENT, ABSENT, LEAVE
+    val paidAmount: Int = 0,
+    val remainingBalance: Int = 0
+) {
+    val effectiveRemaining: Int
+        get() = if (paidAmount > 0) (monthlySalary - paidAmount).coerceAtLeast(0)
+                else if (salaryStatus == "PAID") 0
+                else monthlySalary
+}
 
 @Entity(tableName = "broadcast_alerts")
 data class BroadcastAlertEntity(

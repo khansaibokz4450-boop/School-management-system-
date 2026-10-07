@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import com.example.data.model.StudentEntity
 import java.net.URLEncoder
 
 object WhatsAppHelper {
@@ -78,18 +79,130 @@ object WhatsAppHelper {
         }
     }
 
-    fun buildAbsenteeMessage(studentName: String, className: String, date: String): String {
+    /**
+     * Urdu WhatsApp Receipt for Parents upon Fee Payment
+     */
+    fun buildFeeReceiptUrduMessage(
+        studentName: String,
+        rollNo: String,
+        className: String,
+        month: String,
+        amountPaid: Int,
+        receiptId: String,
+        date: String
+    ): String {
         return """
-            📢 *PAK SCHOOL & COLLEGE*
-            -----------------------------
-            ⚠️ *STUDENT ABSENCE NOTIFICATION*
+            🎓 *پاک اسکول اینڈ کالج سسٹم*
+            ───────────────────
+            🧾 *فیس وصولی کی تصدیقی رسید (Fee Receipt)*
             
-            Respected Parent,
-            Your child *${studentName}* (${className}) was marked *ABSENT* on ${date}.
-            Please contact the school administration office to confirm the reason for absence.
+            محترم والدین،
+            السلام علیکم!
+            اطلاع دی جاتی ہے کہ آپ کے بچے کی فیس کامیابی سے موصول ہو گئی ہے۔
             
-            Regards,
-            Administration | PakSchool SMS
+            👤 *طالب علم کا نام:* $studentName
+            🔢 *رول نمبر:* $rollNo
+            🏫 *کلاس:* $className
+            📅 *مہینہ:* $month
+            💰 *وصول شدہ رقم:* Rs. $amountPaid
+            🔖 *رسید نمبر:* $receiptId
+            🗓️ *تاریخ ادائیگی:* $date
+            
+            بروقت ادائیگی اور آپ کے تعاون کا شکریہ!
+            ───────────────────
+            دفتر اکاؤنٹس و انتظامیہ | پاک اسکول سسٹم
+        """.trimIndent()
+    }
+
+    /**
+     * Urdu Absentee Notification for Parents
+     */
+    fun buildAbsenteeUrduMessage(
+        studentName: String,
+        rollNo: String,
+        className: String,
+        date: String
+    ): String {
+        return """
+            🏫 *پاک اسکول اینڈ کالج سسٹم*
+            ───────────────────
+            ⚠️ *اطلاع غیر حاضری (Absentee Notice)*
+            
+            محترم والدین،
+            السلام علیکم!
+            آپ کا بچہ *$studentName* (رول نمبر: *$rollNo*، کلاس: *$className*) آج مورخہ *$date* کو اسکول سے *غیر حاضر* ہے۔
+            
+            تعلیم کے تسلسل کے لیے روزانہ حاضری انتہائی ضروری ہے۔ برائے مہربانی اپنے بچے کی غیر حاضری کی وجہ تحریری طور پر یا کال کر کے اسکول آفس کو فوری مطلع فرمائیں۔
+            
+            شکریہ،
+            ───────────────────
+            پرنسپل و انتظامیہ | پاک اسکول سسٹم
+        """.trimIndent()
+    }
+
+    /**
+     * Daily Attendance Sheet for Principal (WhatsApp)
+     * Shows:
+     * - Total Count Present (تعداد)
+     * - Total Count Absent
+     * - Complete List of Absent Students with Roll No & Name (ایبسنس رولر کے نام)
+     */
+    fun buildPrincipalDailyAttendanceReport(
+        date: String,
+        className: String,
+        totalStudents: Int,
+        presentCount: Int,
+        absentCount: Int,
+        absentStudents: List<StudentEntity>,
+        isHoliday: Boolean = false,
+        holidayReason: String = "عوامی چھٹی / اتوار"
+    ): String {
+        if (isHoliday) {
+            return """
+                🏫 *پاک اسکول اینڈ کالج سسٹم*
+                ───────────────────────
+                📢 *روزانہ رپورٹ برائے پرنسپل صاحب (Holiday Report)*
+                
+                📅 *تاریخ:* $date
+                🏫 *کلاس / سیکشن:* $className
+                🏖️ *صورتحال:* *اسکول بند ہے (چھٹی کا دن)*
+                📝 *تفصیل:* $holidayReason
+                
+                نوٹ: چھٹی کے باعث طلبہ کے والدین کو غیر حاضری کے پیغامات نہیں بھیجے گئے۔
+                ───────────────────────
+                رپورٹ خودکار سسٹم | پاک اسکول
+            """.trimIndent()
+        }
+
+        val attendanceRate = if (totalStudents > 0) (presentCount * 100) / totalStudents else 0
+        val absenteeListText = if (absentStudents.isEmpty()) {
+            "✅ ماشاءاللہ! آج کوئی طالب علم غیر حاضر نہیں ہے (100% حاضری)۔"
+        } else {
+            val sb = java.lang.StringBuilder()
+            sb.append("📋 *غیر حاضر طلبہ کی فہرست (Roll No & Name):*\n")
+            absentStudents.forEachIndexed { index, student ->
+                sb.append("${index + 1}. [${student.rollNo}] ${student.name} (${student.className}) - فون: ${student.parentPhone}\n")
+            }
+            sb.toString().trimEnd()
+        }
+
+        return """
+            🏫 *پاک اسکول اینڈ کالج سسٹم*
+            ───────────────────────
+            📊 *روزانہ حاضری شیٹ برائے پرنسپل صاحب*
+            
+            📅 *تاریخ:* $date
+            🏫 *کلاس / دائرہ کار:* $className
+            👥 *کل رجسٹرڈ طلبہ:* $totalStudents
+            
+            📈 *حاضری سمری:*
+            🟢 *حاضر طلبہ کی تعداد:* $presentCount ($attendanceRate%)
+            🔴 *غیر حاضر طلبہ کی تعداد:* $absentCount
+            
+            ───────────────────────
+            $absenteeListText
+            ───────────────────────
+            رپورٹ تیار کردہ: اے آئی اسمارٹ اسکول منیجمنٹ سسٹم
         """.trimIndent()
     }
 
@@ -100,17 +213,20 @@ object WhatsAppHelper {
         month: String
     ): String {
         return """
-            📢 *PAK SCHOOL & COLLEGE*
-            -----------------------------
-            💳 *MONTHLY FEE REMINDER*
+            📢 *پاک اسکول اینڈ کالج سسٹم*
+            ───────────────────
+            💳 *ماہانہ فیس کی یاددہانی (Fee Reminder)*
             
-            Respected Parent,
-            The school tuition fee for *${studentName}* (${className}) for the month of *${month}* is *Rs. ${amount}*.
-            Kindly deposit the dues before the scheduled due date to ensure smooth academic progress.
+            محترم والدین،
+            السلام علیکم!
+            طالب علم *$studentName* ($className) کی ماہ *$month* کی اسکول فیس مبلغ *Rs. $amount* واجب الادا ہے۔
             
-            Payment Channels: Cash Counter / JazzCash / EasyPaisa / Bank Transfer.
-            Regards,
-            Accounts Office | PakSchool SMS
+            تعلیمی نظام کو بلاتعطل جاری رکھنے کے لیے برائے مہربانی مقررہ تاریخ سے قبل فیس جمع کرا دیں۔
+            
+            ادائیگی کے ذرائع: کیش کاؤنٹر / JazzCash / EasyPaisa / بینک اکاؤنٹ
+            شکریہ!
+            ───────────────────
+            دفتر اکاؤنٹس | پاک اسکول سسٹم
         """.trimIndent()
     }
 }

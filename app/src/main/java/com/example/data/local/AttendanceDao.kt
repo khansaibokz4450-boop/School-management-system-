@@ -38,4 +38,13 @@ interface AttendanceDao {
 
     @Delete
     suspend fun deleteAttendance(record: AttendanceRecordEntity)
+
+    @Query("DELETE FROM attendance_records WHERE date = :date")
+    suspend fun deleteAttendanceForDate(date: String): Int
+
+    @Query("DELETE FROM attendance_records")
+    suspend fun clearAllAttendanceHistory(): Int
+
+    @Query("SELECT DISTINCT date FROM attendance_records ORDER BY date DESC")
+    fun getAllRecordedDates(): Flow<List<String>>
 }

@@ -69,6 +69,10 @@ class SchoolRepository(private val dao: SchoolDao) {
         dao.insertAttendanceList(records)
     }
 
+    suspend fun deleteAttendanceForDate(date: String): Int = dao.deleteAttendanceForDate(date)
+    suspend fun clearAllAttendanceHistory(): Int = dao.clearAllAttendanceHistory()
+    fun getAllRecordedDates(): Flow<List<String>> = dao.getAllRecordedDates()
+
     // Fees
     val allFeeRecords: Flow<List<FeeRecordEntity>> = dao.getAllFeeRecords()
 

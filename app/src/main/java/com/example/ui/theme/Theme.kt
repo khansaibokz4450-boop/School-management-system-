@@ -51,18 +51,11 @@ private val DarkColorScheme = darkColorScheme(
 
 @Composable
 fun MyApplicationTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false, // Use our handcrafted Institutional green scheme for distinct Pakistani school branding
+    darkTheme: Boolean = false, // Force consistent high-contrast Pakistani institutional light theme
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
+    val colorScheme = LightColorScheme
 
     MaterialTheme(
         colorScheme = colorScheme,

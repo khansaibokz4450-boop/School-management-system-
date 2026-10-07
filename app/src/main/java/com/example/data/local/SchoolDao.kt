@@ -57,6 +57,15 @@ interface SchoolDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAttendanceList(records: List<AttendanceRecordEntity>)
 
+    @Query("DELETE FROM attendance_records WHERE date = :date")
+    suspend fun deleteAttendanceForDate(date: String): Int
+
+    @Query("DELETE FROM attendance_records")
+    suspend fun clearAllAttendanceHistory(): Int
+
+    @Query("SELECT DISTINCT date FROM attendance_records ORDER BY date DESC")
+    fun getAllRecordedDates(): Flow<List<String>>
+
     // --- Fees ---
     @Query("SELECT * FROM fee_records ORDER BY id DESC")
     fun getAllFeeRecords(): Flow<List<FeeRecordEntity>>

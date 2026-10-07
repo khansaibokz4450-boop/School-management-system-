@@ -200,6 +200,39 @@ class SchoolViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun registerNewStudent(
+        name: String,
+        age: Int,
+        className: String,
+        gender: String = "Male"
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val prefix = when {
+                className.startsWith("Class ", ignoreCase = true) -> "C" + className.removePrefix("Class ").trim().padStart(2, '0')
+                className.equals("1st Year", ignoreCase = true) -> "FY"
+                className.equals("2nd Year", ignoreCase = true) -> "SY"
+                else -> className.take(3).uppercase()
+            }
+            val count = (allStudents.value.count { it.className.equals(className, ignoreCase = true) } + 1)
+                .toString().padStart(2, '0')
+            val rollNo = "$prefix-$count"
+
+            val student = StudentEntity(
+                rollNo = rollNo,
+                name = name.trim(),
+                age = age,
+                fatherName = "Parent of ${name.trim()}",
+                className = className,
+                section = "A",
+                parentPhone = "+923001234567",
+                monthlyFee = 3500,
+                feeStatus = "PAID",
+                gender = gender
+            )
+            repository.insertStudent(student)
+        }
+    }
+
     fun deleteStudent(student: StudentEntity) {
         viewModelScope.launch(Dispatchers.IO) {
             repository.deleteStudent(student)
@@ -265,6 +298,38 @@ class SchoolViewModel(application: Application) : AndroidViewModel(application) 
     fun updateStaffSalaryStatus(staff: StaffMemberEntity, status: String) {
         viewModelScope.launch(Dispatchers.IO) {
             repository.updateStaffSalaryStatus(staff, status)
+        }
+    }
+
+    fun recordStaffSalaryPayment(staff: StaffMemberEntity, paidAmount: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val remaining = (staff.monthlySalary - paidAmount).coerceAtLeast(0)
+            val status = when {
+                paidAmount <= 0 -> "UNPAID"
+                paidAmount < staff.monthlySalary -> "PARTIAL"
+                else -> "PAID"
+            }
+            val updated = staff.copy(
+                paidAmount = paidAmount,
+                remainingBalance = remaining,
+                salaryStatus = status
+            )
+            repository.updateStaff(updated)
+        }
+    }
+
+    val allRecordedDates: StateFlow<List<String>> = repository.getAllRecordedDates()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun deleteAttendanceHistoryForDate(date: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.deleteAttendanceForDate(date)
+        }
+    }
+
+    fun clearAllAttendanceHistory() {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.clearAllAttendanceHistory()
         }
     }
 
